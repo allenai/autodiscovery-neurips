@@ -125,11 +125,11 @@ def get_dataset_description(dataset_metadata_path: str) -> str:
     for dataset in metadata['datasets']:
         description.append(f"Dataset Name: {dataset['name']}")
         description.append(f"Dataset Description: {dataset['description']}")
-        description.append("\n### COLUMNS: ###")
-        for col in dataset['columns']['raw']:
-            description.append(f"\n{col['name']}:")
-            description.append(f"  {col['description']}")
-
+        if 'columns' in dataset and 'raw' in dataset['columns']:
+            description.append("\n### COLUMNS: ###")
+            for col in dataset['columns']['raw']:
+                description.append(f"\n{col['name']}:")
+                description.append(f"  {col['description']}")
     return "\n".join(description)
 
 
