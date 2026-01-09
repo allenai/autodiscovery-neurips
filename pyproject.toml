@@ -3,20 +3,24 @@ name = "autodiscovery"
 version = "0.1.0"
 description = "Open-ended Scientific Discovery via Bayesian Surprise"
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.13"
 dependencies = [
     "pip",
     "numpy>=1.21.0,<2.0",
-    "pandas==1.5.3",
+    "pandas>=2.2.0",
     "matplotlib==3.10",
-    "IPython==8.26.0",
+    "IPython>=9.9.0",
     "pyautogen[openai]==0.8",
     "scikit-learn",
     "scipy",
     "statsmodels",
     "h5py",
     "boto3",
+    "autodiscovery-modal @ git+https://github.com/allenai/asta-autodiscovery.git@dev-adk#subdirectory=packages/autodiscovery_modal",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
