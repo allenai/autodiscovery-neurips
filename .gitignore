@@ -18,3 +18,5 @@ results/
 beam_search/
 discoverybench/
 blade/
+
+.envrc

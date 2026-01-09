@@ -5,23 +5,19 @@
 
 ## Installation
 
-Create the environment with:
+Install dependencies with uv:
 
 ```sh
-conda env create -f environment.yml
-conda activate autods
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync
 ```
 
-Set environment variables:
+Set your OpenAI API key:
 
 ```sh
-# (for Linux/MacOS/Bash/Cygwin)
-export PYTHONPATH=$(pwd):$PYTHONPATH;
-
-# (for Windows CMD)
-set PYTHONPATH=%cd%;%PYTHONPATH%
-
-# (if OPENAI_API_KEY is not already set)
 export OPENAI_API_KEY=<key>
 ```
 
@@ -51,7 +47,7 @@ You can also use your own datasets. To do this, pass in a dataset metadata JSON 
 For example, to explore the DiscoveryBench NLS SES dataset, the following command can be used:
 
 ```sh
-python src/run.py \
+uv run python src/run.py \
     --work_dir="work" \
     --out_dir="outputs" \
     --dataset_metadata="discoverybench/real/test/nls_ses/metadata_0.json" \
