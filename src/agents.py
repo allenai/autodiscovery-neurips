@@ -3,13 +3,208 @@ from src.structured_outputs import ExperimentList, ExperimentCode, ExperimentAna
     ExperimentHypothesisList
 import os
 import json
-from autogen.coding import LocalCommandLineCodeExecutor
-from typing import Tuple
+from autogen.coding import LocalCommandLineCodeExecutor, CodeBlock, CodeResult, CodeExecutor
+from typing import Tuple, List
+import re
+from urllib.parse import urlparse
 
 import copy
 from typing import List, Dict
 import autogen.agentchat.contrib.capabilities.transforms as transforms
 from autogen.agentchat.contrib.capabilities import transform_messages
+
+
+class ModalSandboxExecutor(CodeExecutor):
+    """Wrapper for ModalSandboxIPythonBackend to work with Autogen's executor interface."""
+
+    def __init__(self, backend, timeout: int = 30 * 60):
+        """Initialize the Modal sandbox executor.
+
+        Args:
+            backend: ModalSandboxIPythonBackend instance
+            timeout: Timeout in seconds (for compatibility, not used by Modal sandbox)
+        """
+        from code_execution import IPythonExecutor
+        self._executor = IPythonExecutor(backend)
+        self._timeout = timeout
+
+    def _analyze_image(self, image_data: str) -> str:
+        """Analyze a base64-encoded image using GPT-4o.
+
+        Args:
+            image_data: Base64-encoded image data
+
+        Returns:
+            Analysis text
+        """
+        from openai import OpenAI
+
+        client = OpenAI()
+
+        image_analyst_prompt = '''Please analyze the given plot image and provide the following:
+
+1. Plot Type: Identify the type of plot (e.g., heatmap, bar plot, scatter plot) and its purpose.
+2. Axes:
+    * Titles and labels, including units.
+    * Value ranges for both axes.
+3. Data Trends:
+    * For scatter plots: note trends, clusters, or outliers.
+    * For bar plots: highlight the tallest and shortest bars and patterns.
+    * For heatmaps: identify areas of high and low values.
+    etc...
+4. Annotations and Legends: Describe key annotations or legends.
+5. Statistical Insights: Provide insights based on the information presented in the plot.'''
+
+        messages = [
+            {
+                'role': 'system',
+                'content': 'You are a research scientist responsible for analyzing plots and figures from running experiments and providing detailed descriptions.'
+            },
+            {
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': image_analyst_prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_data}"
+                        }
+                    }
+                ]
+            }
+        ]
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            max_tokens=1000,
+        )
+
+        return response.choices[0].message.content
+
+    def execute_code_blocks(self, code_blocks: List[CodeBlock]) -> CodeResult:
+        """Execute code blocks using Modal sandbox.
+
+        Args:
+            code_blocks: List of code blocks to execute
+
+        Returns:
+            CodeResult with execution output and success status
+        """
+        # Combine all code blocks into a single execution
+        code = "\n".join(block.code for block in code_blocks)
+
+        print(f"\n[ModalSandboxExecutor] Executing code in Modal sandbox...")
+        print(f"[ModalSandboxExecutor] Code length: {len(code)} characters")
+
+        try:
+            result = self._executor.run_cell(code)
+
+            print(f"[ModalSandboxExecutor] Execution completed")
+            print(f"[ModalSandboxExecutor] Result keys: {list(result.keys())}")
+            print(f"[ModalSandboxExecutor] Success: {result.get('success', True)}")
+
+            # Get stdout
+            output = result.get("stdout", "")
+
+            print(f"[ModalSandboxExecutor] Stdout length: {len(output)} characters")
+
+            # Get stderr if any
+            if result.get("stderr"):
+                stderr = result["stderr"]
+                print(f"[ModalSandboxExecutor] Stderr: {stderr[:200]}")
+                output += f"\nSTDERR:\n{stderr}"
+
+            # Check for errors
+            if not result.get("success", True):
+                error_msg = result.get("error", "Unknown error")
+                print(f"[ModalSandboxExecutor] Error: {error_msg}")
+                output += f"\nERROR: {error_msg}"
+
+            # If output is empty, add a note
+            if not output.strip():
+                output = "[ModalSandboxExecutor] Code executed but produced no output"
+                print(f"[ModalSandboxExecutor] Warning: No output produced")
+
+            # Store rich outputs for later access
+            self._last_rich_outputs = result.get("rich_outputs", [])
+
+            if self._last_rich_outputs:
+                print(f"[ModalSandboxExecutor] Found {len(self._last_rich_outputs)} rich outputs")
+
+            # Analyze images from rich outputs
+            if self._last_rich_outputs:
+                image_analyses = []
+                for idx, rich_output in enumerate(self._last_rich_outputs):
+                    # Look for PNG images in the rich output
+                    if "image/png" in rich_output:
+                        png_data = rich_output["image/png"]
+                        try:
+                            analysis = self._analyze_image(png_data)
+                            image_analyses.append(f"\n=== Plot Analysis (figure {idx + 1}) ===\n{analysis}\n{'=' * 50}")
+                        except Exception as e:
+                            image_analyses.append(f"\n=== Plot Analysis (figure {idx + 1}) ===\nFailed to analyze image: {str(e)}\n{'=' * 50}")
+
+                if image_analyses:
+                    output += "\n" + "\n".join(image_analyses)
+
+            exit_code = 0 if result.get("success", True) else 1
+
+            return CodeResult(exit_code=exit_code, output=output)
+
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"[ModalSandboxExecutor] Exception occurred: {str(e)}")
+            print(f"[ModalSandboxExecutor] Traceback:\n{error_details}")
+            return CodeResult(exit_code=1, output=f"Execution failed: {str(e)}\n\nTraceback:\n{error_details}")
+
+    def get_last_rich_outputs(self):
+        """Get rich outputs from the last execution."""
+        return getattr(self, '_last_rich_outputs', [])
+
+    @property
+    def timeout(self) -> int:
+        """Return the timeout value."""
+        return self._timeout
+
+    def restart(self) -> None:
+        """Restart the executor (creates a new IPython kernel session)."""
+        # For Modal sandbox, we don't need to explicitly restart
+        # Each execution is isolated
+        pass
+
+    @property
+    def code_extractor(self):
+        """Return the code extractor for this executor."""
+        # Use default markdown code extractor
+        from autogen.coding import MarkdownCodeExtractor
+        return MarkdownCodeExtractor()
+
+
+def parse_bucket_path(bucket_path: str) -> tuple[str, str]:
+    """Parse GCS bucket path into bucket name and key prefix.
+
+    Args:
+        bucket_path: Path like "gs://bucket-name/path/to/prefix/"
+
+    Returns:
+        Tuple of (bucket_name, key_prefix)
+    """
+    # Remove gs:// prefix if present
+    path = bucket_path.replace("gs://", "")
+
+    # Split into bucket and prefix
+    parts = path.split("/", 1)
+    bucket_name = parts[0]
+    key_prefix = parts[1] if len(parts) > 1 else ""
+
+    # Ensure key_prefix ends with / if it's not empty
+    if key_prefix and not key_prefix.endswith("/"):
+        key_prefix += "/"
+
+    return bucket_name, key_prefix
+
 
 IMAGE_ANALYSIS_PATCH = """\
 import matplotlib.pyplot as plt
@@ -107,6 +302,38 @@ class CodeBlockWrapperTransform(transforms.MessageTransform):
         return "CodeBlockWrapperTransform", True
 
 
+class SimpleCodeBlockTransform(transforms.MessageTransform):
+    """Simple transform that extracts code from JSON and wraps it in markdown code blocks."""
+
+    def __init__(self, working_dir="/data"):
+        """Initialize with optional working directory to change to before executing code."""
+        self.working_dir = working_dir
+
+    def apply_transform(self, messages: List[Dict]) -> List[Dict]:
+        # Deep copy messages to avoid modifying the original
+        transformed_messages = copy.deepcopy(messages)
+        message = transformed_messages[-1]
+
+        try:
+            code = json.loads(message["content"]).get("code", "# Failed to parse code from message")
+        except json.JSONDecodeError:
+            code = "# Failed to parse code from message"
+
+        # Prepend code to change to the working directory where data is mounted
+        # This allows code to find files by their basename
+        if self.working_dir:
+            chdir_code = f"import os\nos.chdir('{self.working_dir}')\n\n"
+            code = chdir_code + code
+
+        # Wrap in markdown code blocks
+        message["content"] = f"```python\n{code}\n```"
+
+        return transformed_messages
+
+    def get_logs(self, pre_transform_messages: List[Dict], post_transform_messages: List[Dict]) -> Tuple[str, bool]:
+        return "SimpleCodeBlockTransform", True
+
+
 def get_openai_config(api_key: str | None = None, temperature: float | None = None,
                       reasoning_effort: str | None = None, timeout: int = 600, model_name="o4-mini"):
     config = {
@@ -131,7 +358,8 @@ def get_openai_config(api_key: str | None = None, temperature: float | None = No
 
 
 def get_agents(work_dir, model_name="o4-mini", temperature=None, reasoning_effort=None, branching_factor=3,
-               user_query=None, experiment_first=False, code_timeout=30 * 60) -> dict[str, ConversableAgent]:
+               user_query=None, experiment_first=False, code_timeout=30 * 60, use_modal_sandbox=False,
+               bucket_path=None, dataset_paths=None) -> dict[str, ConversableAgent]:
     llm_config = get_openai_config(api_key=os.getenv("OPENAI_API_KEY"), model_name=model_name, temperature=temperature,
                                    reasoning_effort=reasoning_effort)
 
@@ -251,19 +479,62 @@ def install(package):
         human_input_mode="NEVER",
     )
 
-    ## Timeout Code Executor
-    executor = LocalCommandLineCodeExecutor(
-        timeout=code_timeout,  # Timeout in seconds
-        work_dir=work_dir,
-        # virtual_env_context=create_virtual_env(os.path.join(work_dir, ".venv"))  # TODO: Fix virtual env creation
-    )
-    # TODO: Fix docker-based execution
-    # executor = DockerCommandLineCodeExecutor(
-    #     # image="python:3.11-alpine",
-    #     timeout=30 * 60,  # Timeout in seconds
-    #     work_dir=work_dir,
-    #     # virtual_env_context=create_virtual_env(os.path.join(work_dir, ".venv"))
-    # )
+    ## Code Executor Setup
+    modal_working_dir = None  # Track working directory for Modal sandbox
+
+    if use_modal_sandbox:
+        # Use Modal sandbox for code execution
+        if not bucket_path:
+            raise ValueError("bucket_path is required when use_modal_sandbox is True")
+
+        from autodiscovery_modal import ModalSandboxIPythonBackend
+        import modal
+
+        # Parse bucket path
+        bucket_name, key_prefix = parse_bucket_path(bucket_path)
+
+        # Calculate the working directory for the dataset
+        # The bucket_path already points to the dataset directory
+        # e.g., gs://ai2-autodiscovery/discoverybench/nls_ses
+        # When mounted at /data, files are directly at /data/
+        modal_mount_path = "/data"
+        modal_working_dir = modal_mount_path
+
+        # Get Modal configuration from environment
+        app_name = os.environ.get("MODAL_APP_NAME", "asta-autodiscovery")
+        secret_name = os.environ.get("MODAL_BUCKET_SECRET", "gcs-autodiscovery")
+        bucket_endpoint_url = os.environ.get("GCS_ENDPOINT_URL", "https://storage.googleapis.com")
+
+        # Create Modal backend
+        bucket_secret = modal.Secret.from_name(secret_name)
+        backend = ModalSandboxIPythonBackend.for_bucket_prefix(
+            app_name=app_name,
+            bucket=bucket_name,
+            key_prefix=key_prefix,
+            mount_path=modal_mount_path,
+            read_only=True,
+            bucket_endpoint_url=bucket_endpoint_url,
+            bucket_secret=bucket_secret,
+            env={"DATASET_ROOT": modal_working_dir},
+        )
+
+        executor = ModalSandboxExecutor(backend, timeout=code_timeout)
+        print(f"Using Modal sandbox with bucket gs://{bucket_name}/{key_prefix} mounted at {modal_mount_path}")
+        print(f"Working directory will be: {modal_working_dir}")
+    else:
+        # Use local code executor
+        executor = LocalCommandLineCodeExecutor(
+            timeout=code_timeout,  # Timeout in seconds
+            work_dir=work_dir,
+            # virtual_env_context=create_virtual_env(os.path.join(work_dir, ".venv"))  # TODO: Fix virtual env creation
+        )
+        # TODO: Fix docker-based execution
+        # executor = DockerCommandLineCodeExecutor(
+        #     # image="python:3.11-alpine",
+        #     timeout=30 * 60,  # Timeout in seconds
+        #     work_dir=work_dir,
+        #     # virtual_env_context=create_virtual_env(os.path.join(work_dir, ".venv"))
+        # )
 
     # Create an agent with code executor configuration.
     code_executor = ConversableAgent(
@@ -272,9 +543,19 @@ def install(package):
         code_execution_config={"executor": executor},
         human_input_mode="NEVER",
     )
-    # Apply image analysis patch to the code executor
-    transform_messages_capability = transform_messages.TransformMessages(transforms=[CodeBlockWrapperTransform()])
-    transform_messages_capability.add_to_agent(code_executor)
+
+    # Apply appropriate transform based on executor type
+    if use_modal_sandbox:
+        # For Modal sandbox, use simple transform without image analysis patch
+        # (Modal sandbox handles image analysis internally)
+        # Pass the working_dir so code can change to that directory
+        transform_messages_capability = transform_messages.TransformMessages(
+            transforms=[SimpleCodeBlockTransform(working_dir=modal_working_dir)])
+        transform_messages_capability.add_to_agent(code_executor)
+    else:
+        # For local executor, use full transform with image analysis patch
+        transform_messages_capability = transform_messages.TransformMessages(transforms=[CodeBlockWrapperTransform()])
+        transform_messages_capability.add_to_agent(code_executor)
 
     user_proxy = UserProxyAgent(
         name="user_proxy",

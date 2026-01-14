@@ -65,6 +65,10 @@ class ArgParser(argparse.ArgumentParser):
                           help='Generate experiments before hypotheses')
         self.add_argument('--code_timeout', type=int, default=30 * 60,
                           help='Timeout for code execution in seconds')
+        self.add_argument('--use_modal_sandbox', action=argparse.BooleanOptionalAction, default=False,
+                          help='Use ModalSandboxIPythonBackend for code execution')
+        self.add_argument('--bucket_path', type=str,
+                          help='GCS bucket path for Modal sandbox (e.g., gs://ai2-autodiscovery/discoverybench/)')
         self.add_argument('--run_eda', action=argparse.BooleanOptionalAction, default=False,
                           help='Run EDA as part of the initial experiment')
         self.add_argument('--n_warmstart', type=int, default=8,

@@ -197,7 +197,9 @@ def run_mcts(
         evidence_weight=1.0,
         kl_scale=20.0,
         reward_mode="belief_and_kl",
-        warmstart_experiments=None
+        warmstart_experiments=None,
+        use_modal_sandbox=False,
+        bucket_path=None
 ):
     """
     Run AutoDS exploration. In MCTS, root node level=0 is a dummy node with no experiment, level=1 is the first real node with the dataset loading experiment, levels > 1 are the actual MCTS nodes with hypotheses and experiments.
@@ -234,6 +236,8 @@ def run_mcts(
         kl_scale: Normalization factor for KL divergence in reward calculation.
         reward_mode: Mode for reward calculation (belief, kl, or belief_and_kl).
         warmstart_experiments: Path to JSON file with warmstart experiments to run after data loading but before MCTS selection.
+        use_modal_sandbox: Whether to use ModalSandboxIPythonBackend for code execution.
+        bucket_path: GCS bucket path for Modal sandbox (e.g., gs://ai2-autodiscovery/discoverybench/).
     """
     # Setup logger
     logger = TreeLogger(log_dirname)
@@ -245,13 +249,16 @@ def run_mcts(
     os.makedirs(work_dir, exist_ok=True)
 
     # Copy the dataset file paths to the working directory (to avoid modifying the original dataset)
-    for dataset_fpath in dataset_paths:
-        shutil.copy(dataset_fpath, work_dir)
+    # Note: For Modal sandbox, files are in GCS and will be mounted directly
+    if not use_modal_sandbox:
+        for dataset_fpath in dataset_paths:
+            shutil.copy(dataset_fpath, work_dir)
 
     # Get agents
     agent_objs = get_agents(work_dir, model_name=model_name, temperature=temperature,
                             reasoning_effort=reasoning_effort, branching_factor=branching_factor,
-                            user_query=user_query, experiment_first=experiment_first, code_timeout=code_timeout)
+                            user_query=user_query, experiment_first=experiment_first, code_timeout=code_timeout,
+                            use_modal_sandbox=use_modal_sandbox, bucket_path=bucket_path, dataset_paths=dataset_paths)
     user_proxy = agent_objs["user_proxy"]
     experiment_generator = agent_objs["experiment_generator"]
 
@@ -507,6 +514,8 @@ if __name__ == "__main__":
         kl_scale=args.kl_scale,
         reward_mode=args.reward_mode,
         warmstart_experiments=args.warmstart_experiments,
+        use_modal_sandbox=args.use_modal_sandbox,
+        bucket_path=args.bucket_path,
     )
 
     if args.delete_work_dir:

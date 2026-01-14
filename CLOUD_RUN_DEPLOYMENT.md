@@ -105,23 +105,29 @@ rm .github_token
 
 ## Step 3: Configure Secrets
 
-Before creating the job, set up your OpenAI API key in Secret Manager:
+Before creating the job, set up your API keys in Secret Manager:
 
 ```bash
-# Create the secret (one-time setup)
+# Create the secrets (one-time setup)
 echo -n "your-openai-api-key" | gcloud secrets create autodiscovery-openai-key --data-file=-
+echo -n "your-modal-token-id" | gcloud secrets create autodiscovery-modal-token-id --data-file=-
+echo -n "your-modal-token-secret" | gcloud secrets create autodiscovery-modal-token-secret --data-file=-
+echo -n "your-modal-environment" | gcloud secrets create autodiscovery-modal-environment --data-file=-
+echo -n "your-modal-image-builder-version" | gcloud secrets create autodiscovery-modal-image-builder --data-file=-
 ```
 
-Grant the Cloud Run default service account access to the secret:
+Grant the Cloud Run default service account access to all secrets:
 
 ```bash
 # Get your project number
 PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
 
-# Grant access to the secret
-gcloud secrets add-iam-policy-binding autodiscovery-openai-key \
+# Grant access to all secrets
+for secret in autodiscovery-openai-key autodiscovery-modal-token-id autodiscovery-modal-token-secret autodiscovery-modal-environment autodiscovery-modal-image-builder; do
+  gcloud secrets add-iam-policy-binding $secret \
     --member=serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com \
     --role=roles/secretmanager.secretAccessor
+done
 ```
 
 **Why this is needed**: Cloud Run Jobs use the default compute service account (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`), which needs explicit permission to access secrets in Secret Manager. Without this step, you'll get a "Permission denied" error when creating the job.
@@ -136,7 +142,7 @@ Create the Cloud Run Job with secrets configured:
 gcloud run jobs create autodiscovery-job \
     --image us-west1-docker.pkg.dev/ai2-aristo/autodiscovery/autodiscovery:latest \
     --region us-west1 \
-    --set-secrets OPENAI_API_KEY=autodiscovery-openai-key:latest \
+    --set-secrets OPENAI_API_KEY=autodiscovery-openai-key:latest,MODAL_TOKEN_ID=autodiscovery-modal-token-id:latest,MODAL_TOKEN_SECRET=autodiscovery-modal-token-secret:latest,MODAL_ENVIRONMENT=autodiscovery-modal-environment:latest,MODAL_IMAGE_BUILDER_VERSION=autodiscovery-modal-image-builder:latest \
     --memory 4Gi \
     --cpu 2 \
     --max-retries 0 \
@@ -316,7 +322,7 @@ To update an existing job's configuration (secrets, environment variables, memor
 # Update secrets
 gcloud run jobs update autodiscovery-job \
     --region us-west1 \
-    --set-secrets OPENAI_API_KEY=autodiscovery-openai-key:latest
+    --set-secrets OPENAI_API_KEY=autodiscovery-openai-key:latest,MODAL_TOKEN_ID=autodiscovery-modal-token-id:latest,MODAL_TOKEN_SECRET=autodiscovery-modal-token-secret:latest,MODAL_ENVIRONMENT=autodiscovery-modal-environment:latest,MODAL_IMAGE_BUILDER_VERSION=autodiscovery-modal-image-builder:latest
 
 # Update environment variables
 gcloud run jobs update autodiscovery-job \
@@ -403,6 +409,10 @@ gcloud auth configure-docker us-west1-docker.pkg.dev
 # One-time setup: Store secrets in Secret Manager
 echo -n "YOUR_GITHUB_TOKEN" | gcloud secrets create github-token --data-file=-
 echo -n "YOUR_OPENAI_API_KEY" | gcloud secrets create autodiscovery-openai-key --data-file=-
+echo -n "YOUR_MODAL_TOKEN_ID" | gcloud secrets create autodiscovery-modal-token-id --data-file=-
+echo -n "YOUR_MODAL_TOKEN_SECRET" | gcloud secrets create autodiscovery-modal-token-secret --data-file=-
+echo -n "YOUR_MODAL_ENVIRONMENT" | gcloud secrets create autodiscovery-modal-environment --data-file=-
+echo -n "YOUR_MODAL_IMAGE_BUILDER_VERSION" | gcloud secrets create autodiscovery-modal-image-builder --data-file=-
 
 # Grant Cloud Build access to GitHub token
 PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
@@ -410,10 +420,12 @@ gcloud secrets add-iam-policy-binding github-token \
     --member=serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com \
     --role=roles/secretmanager.secretAccessor
 
-# Grant Cloud Run default service account access to OpenAI key
-gcloud secrets add-iam-policy-binding autodiscovery-openai-key \
+# Grant Cloud Run default service account access to all secrets
+for secret in autodiscovery-openai-key autodiscovery-modal-token-id autodiscovery-modal-token-secret autodiscovery-modal-environment autodiscovery-modal-image-builder; do
+  gcloud secrets add-iam-policy-binding $secret \
     --member=serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com \
     --role=roles/secretmanager.secretAccessor
+done
 
 # Build and push using cloudbuild.yaml (handles GitHub auth)
 gcloud builds submit --config=cloudbuild.yaml
@@ -422,7 +434,7 @@ gcloud builds submit --config=cloudbuild.yaml
 gcloud run jobs create autodiscovery-job \
     --image ${IMAGE} \
     --region ${REGION} \
-    --set-secrets OPENAI_API_KEY=autodiscovery-openai-key:latest \
+    --set-secrets OPENAI_API_KEY=autodiscovery-openai-key:latest,MODAL_TOKEN_ID=autodiscovery-modal-token-id:latest,MODAL_TOKEN_SECRET=autodiscovery-modal-token-secret:latest,MODAL_ENVIRONMENT=autodiscovery-modal-environment:latest,MODAL_IMAGE_BUILDER_VERSION=autodiscovery-modal-image-builder:latest \
     --memory 8Gi \
     --cpu 4 \
     --max-retries 0 \
