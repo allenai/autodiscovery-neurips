@@ -20,3 +20,4 @@ discoverybench/
 blade/
 
 .envrc
+.github_token

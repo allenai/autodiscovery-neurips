@@ -1,0 +1,50 @@
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Outputs and logs
+outputs
+work
+*.log
+
+# Datasets (these should be fetched in Cloud Run)
+discoverybench
+blade
+temp_db
+
+# Documentation
+artifacts
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.github_token
+*.token
