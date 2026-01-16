@@ -29,4 +29,4 @@ RUN --mount=type=secret,id=github_token \
 ENV PYTHONUNBUFFERED=1
 
 # Default entry point - can be overridden
-ENTRYPOINT ["/root/.local/bin/uv", "run", "python", "src/run.py"]
+ENTRYPOINT ["/root/.local/bin/uv", "run", "python", "-m", "autodiscovery.run"]
