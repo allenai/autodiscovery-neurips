@@ -1,5 +1,5 @@
 from autogen import ConversableAgent, UserProxyAgent
-from src.structured_outputs import ExperimentList, ExperimentCode, ExperimentAnalyst, ExperimentReviewer, Experiment, \
+from autodiscovery.structured_outputs import ExperimentList, ExperimentCode, ExperimentAnalyst, ExperimentReviewer, Experiment, \
     ExperimentHypothesisList
 import os
 import json

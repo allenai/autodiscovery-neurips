@@ -8,7 +8,7 @@ from scipy.cluster.hierarchy import linkage
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
-from src.utils import query_llm
+from autodiscovery.utils import query_llm
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -143,7 +143,7 @@ def dedupe(nodes_or_json_path, n_samples=10, merge_threshold=0.7, seed=42, rep_m
     random.seed(seed)
     np.random.seed(seed)
 
-    from src.mcts_utils import get_nodes  # Importing here to avoid circular import issues
+    from autodiscovery.mcts_utils import get_nodes  # Importing here to avoid circular import issues
     nodes_list = get_nodes(nodes_or_json_path)[:n_nodes]
     data = get_hypotheses(nodes_list)
 

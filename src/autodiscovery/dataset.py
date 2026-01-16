@@ -1,7 +1,7 @@
 import json
 import os
 
-from src.utils import fetch_from_s3
+from autodiscovery.utils import fetch_from_s3
 
 
 def load_blade_metadata(info_path: str) -> dict:

@@ -47,7 +47,7 @@ You can also use your own datasets. To do this, pass in a dataset metadata JSON 
 For example, to explore the DiscoveryBench NLS SES dataset, the following command can be used:
 
 ```sh
-uv run python src/run.py \
+uv run python -m autodiscovery.run \
     --work_dir="work" \
     --out_dir="outputs" \
     --dataset_metadata="discoverybench/real/test/nls_ses/metadata_0.json" \

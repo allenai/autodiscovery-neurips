@@ -7,8 +7,8 @@ from datetime import datetime
 
 import numpy as np
 
-from src.mcts_utils import get_query_from_experiment, get_experiment_from_query, get_node_level_idx, get_context_string
-from src.utils import try_loading_dict
+from autodiscovery.mcts_utils import get_query_from_experiment, get_experiment_from_query, get_node_level_idx, get_context_string
+from autodiscovery.utils import try_loading_dict
 
 
 class MCTSNode(object):
@@ -105,7 +105,7 @@ class MCTSNode(object):
 
         # Belief attributes
         self.surprising = data.get('surprising', self.surprising)
-        from src.beliefs import BELIEF_MODE_TO_CLS  # Import here to avoid circular import issues
+        from autodiscovery.beliefs import BELIEF_MODE_TO_CLS  # Import here to avoid circular import issues
         if 'prior' in data and data['prior']:
             belief_cls = BELIEF_MODE_TO_CLS[data['prior']['_type']]
             self.prior = belief_cls.DistributionFormat(**data['prior'])

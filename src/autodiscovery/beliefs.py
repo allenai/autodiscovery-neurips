@@ -3,9 +3,9 @@ from typing import List, Dict, Tuple, Optional
 import numpy as np
 from pydantic import BaseModel, Field
 
-from src.mcts import MCTSNode
-from src.mcts_utils import get_context_string
-from src.utils import query_llm, fuse_gaussians
+from autodiscovery.mcts import MCTSNode
+from autodiscovery.mcts_utils import get_context_string
+from autodiscovery.utils import query_llm, fuse_gaussians
 
 from scipy.special import betaln, gammaln, psi  # betaln = log Beta function, psi = digamma
 

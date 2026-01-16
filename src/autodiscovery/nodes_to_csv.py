@@ -2,7 +2,7 @@ import json
 import csv
 import argparse
 
-from src.utils import try_loading_dict
+from autodiscovery.utils import try_loading_dict
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -14,7 +14,7 @@ class ArgParser(argparse.ArgumentParser):
 
 
 def nodes_to_csv(nodes_or_json_path, out_fpath):
-    from src.mcts_utils import get_nodes, get_node_level_idx  # Import here to avoid circular import issues
+    from autodiscovery.mcts_utils import get_nodes, get_node_level_idx  # Import here to avoid circular import issues
     mcts_nodes = get_nodes(nodes_or_json_path)
 
     csv_list = []

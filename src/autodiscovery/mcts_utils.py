@@ -7,9 +7,9 @@ from glob import glob
 
 from autogen import GroupChat, GroupChatManager
 
-from src.deduplication import dedupe
-from src.nodes_to_csv import nodes_to_csv
-from src.transitions import SpeakerSelector
+from autodiscovery.deduplication import dedupe
+from autodiscovery.nodes_to_csv import nodes_to_csv
+from autodiscovery.transitions import SpeakerSelector
 
 
 def load_mcts_from_json(json_obj_or_file_or_dir, args=None, replay_mcts=True):
@@ -22,7 +22,7 @@ def load_mcts_from_json(json_obj_or_file_or_dir, args=None, replay_mcts=True):
         root: Root MCTSNode
         nodes_by_level: Dictionary mapping levels to lists of MCTSNodes
     """
-    from src.mcts import MCTSNode  # Import here to avoid circular import issues
+    from autodiscovery.mcts import MCTSNode  # Import here to avoid circular import issues
 
     node_data = get_nodes(json_obj_or_file_or_dir)
 
@@ -102,7 +102,7 @@ def save_nodes(nodes_dict_or_list, log_dirname, run_dedupe=True, model="gpt-4o",
         save_csv: Whether to save nodes to a CSV file.
         time_elapsed: Optional time elapsed for logging purposes.
     """
-    from src.mcts import MCTSNode  # Import here to avoid circular import issues
+    from autodiscovery.mcts import MCTSNode  # Import here to avoid circular import issues
 
     if type(nodes_dict_or_list) in [dict, defaultdict]:
         nodes_list = []
@@ -276,7 +276,7 @@ def get_experiment_from_query(query):
 
 
 def get_node_level_idx(node_or_id):
-    from src.mcts import MCTSNode
+    from autodiscovery.mcts import MCTSNode
 
     # Get the level and index of a node from its ID (e.g., "node_<level>_<idx>") or MCTSNode/dict.
     if type(node_or_id) is MCTSNode:

@@ -3,18 +3,18 @@ import json
 from collections import defaultdict
 from time import time
 
-from src.agents import get_agents
-from src.mcts import MCTSNode, default_mcts_selection, beam_search, progressive_widening, progressive_widening_all, \
+from autodiscovery.agents import get_agents
+from autodiscovery.mcts import MCTSNode, default_mcts_selection, beam_search, progressive_widening, progressive_widening_all, \
     ucb1_recursive
-from src.dataset import get_datasets_fpaths, get_load_dataset_experiment
-from src.logger import TreeLogger
+from autodiscovery.dataset import get_datasets_fpaths, get_load_dataset_experiment
+from autodiscovery.logger import TreeLogger
 
-from src.beliefs import calculate_prior_and_posterior_beliefs
+from autodiscovery.beliefs import calculate_prior_and_posterior_beliefs
 from datetime import datetime
 import shutil
 
-from src.args import ArgParser
-from src.mcts_utils import load_mcts_from_json, save_nodes, get_msgs_from_latest_query, setup_group_chat, \
+from autodiscovery.args import ArgParser
+from autodiscovery.mcts_utils import load_mcts_from_json, save_nodes, get_msgs_from_latest_query, setup_group_chat, \
     print_node_info, get_self_value, get_context_string
 
 
