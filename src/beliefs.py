@@ -1122,6 +1122,7 @@ def get_belief(
             distribution = belief_cls.parse_response(response, weight=weight, **prior_params_or_none)
             # Compute and store the mean belief
             mean_belief = distribution.get_mean_belief()
+            break
         except Exception as e:
             if attempt == n_retries - 1:
                 print(f"Querying LLM: ERROR: {e}\nMax retries reached. Returning empty distribution.")
